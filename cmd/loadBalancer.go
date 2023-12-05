@@ -7,47 +7,71 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 
 	"github.com/spf13/cobra"
 )
 
-type RRQueue struct {
-	Hosts []string
+type LbAlgorithm int
+
+const (
+	RoundRobin LbAlgorithm = iota
+	LeastConnections
+	LeastTime
+)
+
+type LoadBalancer interface {
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
+type RRLoadBalancer struct {
+	Hosts []url.URL
 	Index int
 }
 
-var (
-	RRQueueInstance       RRQueue = RRQueue{}
-	LoadBalancerAlgorithm string
-	Client                *http.Client = &http.Client{}
-	Port                  int
+func (rr *RRLoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	reverseProxy := httputil.NewSingleHostReverseProxy(&rr.Hosts[rr.Index])
+	rr.NextHost()
+	reverseProxy.ServeHTTP(w, r)
+}
 
-	algorithmUsage string = `Possible values:	
-	roundRobin
-	leastConnections
-	leastTime
-	`
+func (rr *RRLoadBalancer) NextHost() { rr.Index = (rr.Index + 1) % len(rr.Hosts) }
+
+func NewRRLoadBalancer(hosts []url.URL) *RRLoadBalancer {
+	return &RRLoadBalancer{
+		Hosts: hosts,
+	}
+}
+
+var (
+	LoadBalancerAlgorithm string
+	Port                  int
+	Hosts                 []string
+	algorithmUsage        string = `Possible values:	
+roundRobin
+leastConnections
+leastTime
+`
 )
 
 // loadBalancerCmd represents the loadBalancer command
 var loadBalancerCmd = &cobra.Command{
 	Use:   "loadBalancer",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "loadBalancer starts the load balancer",
+	Long:  `loadBalancer starts the load balancer with the specified algorithm and hosts`,
 	Run: func(cmd *cobra.Command, args []string) {
-		verifyFlags()
+		verifyFlags(cmd)
+
+		var lb LoadBalancer
+
+		urls := parseHosts()
+
 		switch LoadBalancerAlgorithm {
 		case "roundRobin":
 			log.Println("Starting load balancer with RoundRobin algorithm")
-			rrhandle := RRHandler{}
-			port := fmt.Sprintf(":%d", Port)
-			http.ListenAndServe(port, rrhandle)
+			lb = NewRRLoadBalancer(urls)
+
 		case "leastConnections":
 			//TODO: implement leastConnections
 			log.Fatal("LeastConnections algorithm not implemented yet")
@@ -55,12 +79,23 @@ to quickly create a Cobra application.`,
 			//TODO: implement leastTime
 			log.Fatal("LeastTime algorithm not implemented yet")
 		}
+
+		http.Handle("/", lb)
 	},
 }
 
-func verifyFlags() {
-	if len(RRQueueInstance.Hosts) == 0 {
+func parseHosts() (urls []url.URL) {
+	for _, v := range Hosts {
+		u, _ := url.Parse(v)
+		urls = append(urls, *u)
+	}
+	return urls
+}
+
+func verifyFlags(cmd *cobra.Command) {
+	if len(Hosts) == 0 {
 		log.Fatal("No hosts provided")
+		cmd.Usage()
 	}
 
 	if LoadBalancerAlgorithm == "" {
@@ -77,47 +112,30 @@ func verifyFlags() {
 	}
 }
 
-type RRHandler struct{}
-
-func (RRHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO: implenting parse from a config file to parse possible paths and deny anything different
-
-	parseURL, err := url.Parse(r.URL.String())
-	path := parseURL.Path
-
-	// Create the request forwarding it to the next host in the queue
-	request, err := http.NewRequest(r.Method, RRQueueInstance.Hosts[RRQueueInstance.Index]+path, r.Body)
-
-	if err != nil {
-		log.Println("Error creating request:", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := Client.Do(request)
-	if err != nil {
-		log.Println("Error sending request:", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	for k, v := range resp.Header {
-		w.Header()[k] = v
-	}
-
-	w.WriteHeader(resp.StatusCode)
-}
-
-func (rr *RRQueue) UpdateQueueIndex() { rr.Index = (rr.Index + 1) % len(rr.Hosts) }
-
-// RoundRobin is a function that load balances the hosts equally
-func RoundRobin() {}
-
 func init() {
 	rootCmd.AddCommand(loadBalancerCmd)
-	loadBalancerCmd.Flags().StringSliceVarP(&RRQueueInstance.Hosts, "hosts", "H", []string{}, "Hosts to load balance")
-	loadBalancerCmd.Flags().IntVarP(&Port, "port", "p", 8080, "Port to listen to")
+	loadBalancerCmd.Flags().StringSliceVarP(
+		&Hosts,
+		"hosts",
+		"H",
+		[]string{},
+		"Hosts to load balance",
+	)
+
+	loadBalancerCmd.Flags().IntVarP(
+		&Port,
+		"port",
+		"p",
+		8080,
+		"Port to listen to",
+	)
 
 	// list of options for the load balancer algorithm
-	loadBalancerCmd.Flags().StringVarP(&LoadBalancerAlgorithm, "algorithm", "a", "roundRobin", algorithmUsage)
+	loadBalancerCmd.Flags().StringVarP(
+		&LoadBalancerAlgorithm,
+		"algorithm",
+		"a",
+		"roundRobin",
+		algorithmUsage,
+	)
 }
