@@ -1,4 +1,4 @@
-![plot](./assets/logo.svg =250x250)
+<img src="./assets/logo.svg" alt="Conduit Logo" width="200"/>
 
 # Conduit
 Conduit is a powerful and versatile command-line application for HTTP routing and load balancing. Designed to be lightweight, easy to use, and highly configurable, Conduit is ideal for developers and network administrators who need an effective solution for traffic handling, load distribution, and basic network request manipulation.
