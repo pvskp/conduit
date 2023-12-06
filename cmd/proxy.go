@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -43,17 +44,19 @@ $ conduit proxy -p 8080`,
 type proxyHandler struct{}
 
 func (proxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	protocol := "" // Default as http
-	if r.TLS != nil {
-		protocol = "https://"
+	url := r.URL.String()
+	if !strings.HasPrefix(r.URL.String(), "http://") {
+		protocol := "http://"
+		if r.TLS != nil {
+			protocol = "https://"
+		}
+		url = protocol + url
+		if protocol == "" {
+			log.Println("Using protocol http")
+		} else {
+			log.Println("Using protocol https") //TODO: HTTPS not implemented yet
+		}
 	}
-	if protocol == "" {
-		log.Println("Using protocol http")
-	} else {
-		log.Println("Using protocol https") //TODO: HTTPS not implemented yet
-	}
-
-	url := protocol + r.RequestURI
 	log.Printf("Received new HTTP connection to %s: from %s\n", r.URL.Host, r.RemoteAddr)
 	req, err := http.NewRequest(r.Method, url, r.Body)
 	if err != nil {

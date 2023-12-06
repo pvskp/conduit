@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -31,6 +32,7 @@ type RRLoadBalancer struct {
 }
 
 func (rr *RRLoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("New request received. Forwarding to %s\n", rr.Hosts[rr.Index].String())
 	reverseProxy := httputil.NewSingleHostReverseProxy(&rr.Hosts[rr.Index])
 	rr.NextHost()
 	reverseProxy.ServeHTTP(w, r)
@@ -55,7 +57,18 @@ leastTime
 `
 )
 
-// loadBalancerCmd represents the loadBalancer command
+// ParseUrl identifies if a given host has a protocol on it's string
+// If do not, it adds "http://" before the string
+func ParseUrl(host string) string {
+	if strings.HasPrefix(host, "http://") {
+		return host
+	} else if strings.HasPrefix(host, "https://") {
+		return host
+	}
+
+	return fmt.Sprintf("%s%s", "http://", host)
+}
+
 var loadBalancerCmd = &cobra.Command{
 	Use:   "loadBalancer",
 	Short: "loadBalancer starts the load balancer",
@@ -63,14 +76,20 @@ var loadBalancerCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		verifyFlags(cmd)
 
-		var lb LoadBalancer
+		for i, h := range Hosts {
+			Hosts[i] = ParseUrl(h)
+		}
 
 		urls := parseHosts()
-
+		var lb LoadBalancer
 		switch LoadBalancerAlgorithm {
 		case "roundRobin":
 			log.Println("Starting load balancer with RoundRobin algorithm")
 			lb = NewRRLoadBalancer(urls)
+			http.HandleFunc("/", lb.ServeHTTP)
+			if err := http.ListenAndServe(fmt.Sprintf(":%d", Port), nil); err != nil {
+				log.Fatalf("Error starting server: %s", err)
+			}
 
 		case "leastConnections":
 			//TODO: implement leastConnections
@@ -79,14 +98,15 @@ var loadBalancerCmd = &cobra.Command{
 			//TODO: implement leastTime
 			log.Fatal("LeastTime algorithm not implemented yet")
 		}
-
-		http.Handle("/", lb)
 	},
 }
 
 func parseHosts() (urls []url.URL) {
 	for _, v := range Hosts {
-		u, _ := url.Parse(v)
+		u, err := url.Parse(v)
+		if err != nil {
+			log.Fatal(err)
+		}
 		urls = append(urls, *u)
 	}
 	return urls
