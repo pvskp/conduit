@@ -20,12 +20,13 @@ var (
 // proxyCmd represents the proxy command
 var proxyCmd = &cobra.Command{
 	Use:   "proxy",
-	Short: "Initiate Conduit as a HTTP proxy.",
-	Long: `Initiate Conduit as a HTTP proxy. 
-This will start a HTTP server on the specified port and will forward all requests to the specified host.
+	Short: "Starts a HTTP proxy server",
+	Long: `Starts a HTTP proxy server on the specified port. The proxy forwards all incoming HTTP requests to the target hosts defined in the configuration.
 
-Example:
-$ conduit proxy -p 8080`,
+Usage example:
+$ conduit proxy -p 8080
+
+This command will start the proxy server listening on port 8080.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Println("Initiating proxy mode...")
 		// Creates a connection handler

@@ -71,8 +71,15 @@ func ParseUrl(host string) string {
 
 var loadBalancerCmd = &cobra.Command{
 	Use:   "loadBalancer",
-	Short: "loadBalancer starts the load balancer",
-	Long:  `loadBalancer starts the load balancer with the specified algorithm and hosts`,
+	Short: "Starts a load balancer",
+	Long: `Starts a load balancer that distributes incoming HTTP requests across multiple backend servers. This load balancer supports different algorithms such as Round Robin, Least Connections, and Least Time, providing flexibility in handling traffic.
+
+By default, the load balancer uses the Round Robin algorithm, which distributes requests evenly across all available servers. This is useful for ensuring that no single server bears too much load.
+
+Usage example:
+$ conduit loadBalancer -a roundRobin -H http://server1.example.com,http://server2.example.com -p 8080
+
+This command will start the load balancer listening on port 8080 and distribute incoming requests between server1.example.com and server2.example.com using the Round Robin algorithm.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		verifyFlags(cmd)
 
