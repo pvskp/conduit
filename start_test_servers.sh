@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
 
+# You can use this script to test conduit. It starts all test servers and waits for them to finish.
+# Press Ctrl+C to stop all servers.
+
 trap handle_interruption INT
 
 pids=()
