@@ -13,7 +13,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "conduit",
 	Short: "Conduit is a versatile network tool for HTTP routing and load balancing",
-	Long: `Conduit is a powerful command-line application designed for HTTP routing and load balancing. It provides various network functionalities including running a simple HTTP proxy and a configurable load balancer.
+	Long: `Conduit is a versatile command-line application designed for HTTP routing and load balancing. It provides various network functionalities including running a simple HTTP proxy and a configurable load balancer.
 
 Example usage:
 1. Start a proxy server:
